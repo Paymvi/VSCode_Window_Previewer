@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- Only for NotifyIcon (the tray icon); everything visible is WPF. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- Off because WPF + WinForms global usings collide (Application, MessageBox...). -->
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- WPF0001: .NET 9 Fluent ThemeMode is marked experimental. -->
+    <!-- WFO0003: WinForms analyzer wants DPI via its API; this is a WPF app, which reads it from the manifest. -->
+    <NoWarn>$(NoWarn);WPF0001;WFO0003</NoWarn>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <AssemblyName>ProjectPreviews</AssemblyName>
+    <Product>Project Previews</Product>
+    <AssemblyTitle>Project Previews</AssemblyTitle>
+    <Description>Identify and switch between VS Code windows</Description>
+    <Version>1.0.0</Version>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System" />
+    <Using Include="System.IO" />
+    <Using Include="System.Linq" />
+    <Using Include="System.Collections.Generic" />
+    <Using Include="System.Threading.Tasks" />
+    <InternalsVisibleTo Include="ProjectPreviews.Tests" />
+    <Resource Include="Assets\app.ico" />
+    <!-- Built by tools\pack-companion.ps1; shipped next to the exe for the "Install companion extension" button. -->
+    <None Include="..\..\companion\project-previews-companion.vsix" Link="companion\project-previews-companion.vsix" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\..\companion\project-previews-companion.vsix')" />
+  </ItemGroup>
+
+</Project>

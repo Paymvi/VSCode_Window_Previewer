@@ -1,0 +1,17 @@
+{
+  "name": "project-previews-companion",
+  "displayName": "Project Previews Companion",
+  "description": "Tells the Project Previews desktop app which folder each VS Code window has open, so its window picker can show the right project name. Local only.",
+  "version": "1.0.0",
+  "publisher": "projectpreviews",
+  "license": "MIT",
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Other"],
+  "main": "./extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "extensionKind": ["ui"],
+  "capabilities": {
+    "untrustedWorkspaces": { "supported": true },
+    "virtualWorkspaces": true
+  }
+}
