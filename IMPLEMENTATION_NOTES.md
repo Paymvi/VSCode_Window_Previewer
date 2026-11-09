@@ -103,7 +103,9 @@ hover (dwell). Live updates while the picker is open use WinEvent hooks scoped t
 (destroy/show/name change/minimize) with 150 ms debounce, keeping card order stable. Settings writes are atomic
 (temp file + move).
 
-## Validation (2026-11-08, Windows 11, single 2880×1620 monitor at 200%, 4–11 VS Code windows)
+## Validation
+
+2026-11-08, Windows 11, single 2880×1620 monitor at 200%, 4–11 VS Code windows.
 
 **Automated:** 51 unit tests (alias precedence, path normalization and URI decoding, Claude Workers parsing,
 settings recovery/clamping/round-trip, title parsing, report→identity, focus/title binding, duplicate
