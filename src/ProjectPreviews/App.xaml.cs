@@ -550,8 +550,10 @@ public partial class App : Application
         {
             _settingsWindow = new SettingsWindow();
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
-            _settingsWindow.Show();
+            // no taskbar button, so minimizing hides to the tray instead of leaving a stray title bar
+            _settingsWindow.StateChanged += (_, _) => { if (_settingsWindow?.WindowState == WindowState.Minimized) _settingsWindow.Hide(); };
         }
+        _settingsWindow.Show();
         if (_settingsWindow.WindowState == WindowState.Minimized) _settingsWindow.WindowState = WindowState.Normal;
         _settingsWindow.Activate();
     }
