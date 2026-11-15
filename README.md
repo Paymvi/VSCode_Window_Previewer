@@ -105,6 +105,10 @@ The colored dot next to each row sets the project's **accent color**, the stripe
 *The sample card updates as you move the sliders. More blur makes the preview behind the name softer; more
 darkness makes the name stand out more. Defaults: blur 10, darkness 45%.*
 
+**Preview size** (75–150%) makes the whole card bigger or smaller. **Center text size** (75–150%) changes only the
+project name and file name in the middle of each card. **Reset sizes** puts both back to 100% and leaves your other
+settings alone.
+
 **Theme** can follow Windows (**System**) or be fixed to **Light** or **Dark**. The cards themselves stay dark
 in both, so the white names remain readable:
 

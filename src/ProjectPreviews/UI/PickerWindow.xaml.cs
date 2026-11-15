@@ -16,7 +16,7 @@ public enum PickerMode { Hover, Keyboard }
 public partial class PickerWindow : Window
 {
     private const double Gap = 10, ShadowPad = 24, Chrome = 6 + 10 + 22 + 6 + 2; // padding + header + border
-    private static readonly double CellW = CardView.W + 12, CellH = CardView.H + 12;
+    private double CellW = CardView.W + 12, CellH = CardView.H + 12;
 
     private readonly List<nint> _order = [];
     private readonly Dictionary<nint, CardView> _cards = [];
@@ -77,6 +77,7 @@ public partial class PickerWindow : Window
         Header.ClearValue(TextBlock.ForegroundProperty);
 
         SetNoActivate(mode == PickerMode.Hover);
+        (CellW, CellH) = (CardView.W * s.CardScale + 12, CardView.H * s.CardScale + 12);
         Layout(windows.Count);
 
         if (!wasVisible)
@@ -120,7 +121,7 @@ public partial class PickerWindow : Window
         CardsPanel.Children.Clear();
         foreach (var w in windows) CardsPanel.Children.Add(_cards[w.Hwnd].Button);
         if (CardsPanel.Children.Count == 0)
-            CardsPanel.Children.Add(new CardView(new CardModel("Warm-up", "", Colors.SteelBlue, "x", "y", ""), s.Blur, s.Darkness).Button);
+            CardsPanel.Children.Add(new CardView(new CardModel("Warm-up", "", Colors.SteelBlue, "x", "y", ""), s.Blur, s.Darkness, cardScale: s.CardScale, textScale: s.TextScale).Button);
         SetNoActivate(true);
         _warming = true;
         Root.Opacity = 0;
@@ -150,11 +151,11 @@ public partial class PickerWindow : Window
             keep.Add(h);
             string? left = w.Minimized ? "Minimized" : null;
             string? right = w.DuplicateCount > 1 ? $"{w.DuplicateIndex} of {w.DuplicateCount}" : null;
-            string sig = string.Join('\u0001', w.Alias, w.Subtitle, w.Accent, left, right, s.Blur, s.Darkness, w.Identity.Path ?? w.Title);
+            string sig = string.Join('\u0001', w.Alias, w.Subtitle, w.Accent, left, right, s.Blur, s.Darkness, s.CardScale, s.TextScale, w.Identity.Path ?? w.Title);
             if (!_cards.TryGetValue(h, out var card) || _signatures[h] != sig)
             {
                 string name = $"{w.Alias}, {w.Subtitle}{(left is null ? "" : ", minimized")}{(right is null ? "" : $", window {right}")}";
-                card = new CardView(new CardModel(w.Alias, w.Subtitle, CardView.ParseColor(w.Accent), left, right, name), s.Blur, s.Darkness) { Hwnd = h };
+                card = new CardView(new CardModel(w.Alias, w.Subtitle, CardView.ParseColor(w.Accent), left, right, name), s.Blur, s.Darkness, cardScale: s.CardScale, textScale: s.TextScale) { Hwnd = h };
                 card.Button.Click += (_, _) => CardChosen?.Invoke(h);
                 card.Button.ToolTip = w.Identity.Path ?? w.Title;
                 _cards[h] = card;

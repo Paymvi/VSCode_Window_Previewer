@@ -61,12 +61,9 @@
 
             <!-- Appearance -->
             <Border Style="{StaticResource Section}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Margin="0,0,20,0">
+                <!-- Wraps so a large preview moves below the controls instead of squeezing them. -->
+                <WrapPanel>
+                    <StackPanel Width="320" Margin="0,0,20,0">
                         <TextBlock Style="{StaticResource H}" Text="Appearance" />
                         <TextBlock Text="Theme" Margin="0,0,0,4" />
                         <ComboBox x:Name="ThemeBox" Width="200" HorizontalAlignment="Left" AutomationProperties.Name="Theme">
@@ -78,13 +75,18 @@
                         <Slider x:Name="BlurSlider" Minimum="0" Maximum="40" SmallChange="1" LargeChange="5" AutomationProperties.Name="Blur amount" />
                         <TextBlock x:Name="DarkLabel" Margin="0,10,0,2" />
                         <Slider x:Name="DarkSlider" Minimum="0" Maximum="90" SmallChange="1" LargeChange="10" AutomationProperties.Name="Darkness amount" />
+                        <TextBlock x:Name="CardSizeLabel" Margin="0,10,0,2" />
+                        <Slider x:Name="CardSizeSlider" Minimum="75" Maximum="150" SmallChange="5" LargeChange="25" TickFrequency="5" IsSnapToTickEnabled="True" AutomationProperties.Name="Preview size, percent" />
+                        <TextBlock x:Name="TextSizeLabel" Margin="0,10,0,2" />
+                        <Slider x:Name="TextSizeSlider" Minimum="75" Maximum="150" SmallChange="5" LargeChange="25" TickFrequency="5" IsSnapToTickEnabled="True" AutomationProperties.Name="Center text size, percent" />
+                        <Button x:Name="ResetSizesButton" Content="Reset sizes" HorizontalAlignment="Left" Padding="12,4" Margin="0,10,0,0" />
                     </StackPanel>
-                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <StackPanel VerticalAlignment="Center" Margin="0,0,0,4">
                         <TextBlock Style="{StaticResource Note}" Text="Preview" Margin="6,0,0,4" />
                         <Border x:Name="SampleHost" Background="{DynamicResource PopupBg}" CornerRadius="12" Padding="4"
-                                BorderBrush="{DynamicResource PopupBorder}" BorderThickness="1" />
+                                BorderBrush="{DynamicResource PopupBorder}" BorderThickness="1" HorizontalAlignment="Left" />
                     </StackPanel>
-                </Grid>
+                </WrapPanel>
             </Border>
 
             <!-- Projects -->

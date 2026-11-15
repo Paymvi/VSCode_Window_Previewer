@@ -131,6 +131,24 @@ public class SettingsTests
         Assert.True(s.Enabled);
         Assert.True(s.HoverEnabled);
         Assert.Equal(ThemeChoice.System, s.Theme);
+        Assert.Equal(1, s.CardScale);
+        Assert.Equal(1, s.TextScale);
+    }
+
+    [Fact]
+    public void Size_scales_default_when_absent_and_are_clamped()
+    {
+        string path = TempFile();
+        File.WriteAllText(path, """{ "Blur": 7 }"""); // settings saved before these existed
+        var old = SettingsStore.Load(path, out _);
+        Assert.Equal((1.0, 1.0), (old.CardScale, old.TextScale));
+        File.WriteAllText(path, """{ "CardScale": 9, "TextScale": 0.1 }""");
+        var s = SettingsStore.Load(path, out _);
+        Assert.Equal((AppSettings.MaxScale, AppSettings.MinScale), (s.CardScale, s.TextScale));
+        s.CardScale = 1.25; s.TextScale = 0.8;
+        SettingsStore.Save(path, s);
+        var back = SettingsStore.Load(path, out _);
+        Assert.Equal((1.25, 0.8), (back.CardScale, back.TextScale));
     }
 
     [Fact]

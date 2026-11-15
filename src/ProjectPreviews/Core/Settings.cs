@@ -26,12 +26,19 @@ public sealed class AppSettings
     public double Blur { get; set; } = 10;
     /// <summary>Black overlay opacity, 0–0.9.</summary>
     public double Darkness { get; set; } = 0.45;
+    /// <summary>Preview card size, 1 = original 272×156 DIPs.</summary>
+    public double CardScale { get; set; } = 1;
+    /// <summary>Center text (alias, subtitle) size on top of the card size, 1 = original.</summary>
+    public double TextScale { get; set; } = 1;
+    public const double MinScale = 0.75, MaxScale = 1.5;
     public Dictionary<string, ProjectPref> Projects { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     internal void Sanitize()
     {
         Blur = double.IsFinite(Blur) ? Math.Clamp(Blur, 0, 40) : 10;
         Darkness = double.IsFinite(Darkness) ? Math.Clamp(Darkness, 0, 0.9) : 0.45;
+        CardScale = double.IsFinite(CardScale) ? Math.Clamp(CardScale, MinScale, MaxScale) : 1;
+        TextScale = double.IsFinite(TextScale) ? Math.Clamp(TextScale, MinScale, MaxScale) : 1;
         if (!Enum.IsDefined(Theme)) Theme = ThemeChoice.System;
         if (string.IsNullOrWhiteSpace(Shortcut)) Shortcut = "Ctrl+Alt+Space";
         // Re-key through NormalizeKey so hand edits ("C:/Foo/") still match, and drop empty entries.

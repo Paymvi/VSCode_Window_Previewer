@@ -19,7 +19,8 @@ public partial class SettingsWindow : Window
         ("Cyan", "#06B6D4"), ("Yellow", "#EAB308"), ("Red", "#EF4444"), ("Indigo", "#6366F1"), ("Teal", "#14B8A6"),
     ];
 
-    private readonly CardView _sample;
+    private CardView _sample = null!;
+    private BitmapSource? _sampleImage;
     private bool _loading;
     private static App A => App.Current;
 
@@ -29,11 +30,7 @@ public partial class SettingsWindow : Window
         // Fit high-scale/small screens (860 DIPs is taller than a 1080p screen at 200%); the content scrolls.
         Height = Math.Min(Height, SystemParameters.WorkArea.Height - 24);
         Icon = BitmapFrame.Create(new Uri("pack://application:,,,/Assets/app.ico"));
-        _sample = new CardView(new CardModel("Sample Project", "index.ts", Color.FromRgb(0x3B, 0x82, 0xF6), null, null, "Sample card"),
-            A.Settings.Blur, A.Settings.Darkness, liveBlur: true);
-        _sample.Button.Focusable = false;
-        _sample.SetImage(SyntheticEditor()); // captured previews are already blurred, so the sample uses its own image
-        SampleHost.Child = _sample.Button;
+        BuildSample();
 
         EnabledBox.Checked += (_, _) => Change(s => s.Enabled = true);
         EnabledBox.Unchecked += (_, _) => Change(s => s.Enabled = false);
@@ -51,6 +48,9 @@ public partial class SettingsWindow : Window
         };
         BlurSlider.ValueChanged += (_, e) => { UpdateLookLabels(); if (!_loading) Change(s => s.Blur = Math.Round(e.NewValue), apply: false); };
         DarkSlider.ValueChanged += (_, e) => { UpdateLookLabels(); if (!_loading) Change(s => s.Darkness = Math.Round(e.NewValue) / 100, apply: false); };
+        CardSizeSlider.ValueChanged += (_, e) => { UpdateLookLabels(); if (!_loading) { Change(s => s.CardScale = Math.Round(e.NewValue) / 100, apply: false); BuildSample(); } };
+        TextSizeSlider.ValueChanged += (_, e) => { UpdateLookLabels(); if (!_loading) { Change(s => s.TextScale = Math.Round(e.NewValue) / 100, apply: false); BuildSample(); } };
+        ResetSizesButton.Click += (_, _) => { CardSizeSlider.Value = 100; TextSizeSlider.Value = 100; };
         ShortcutText.PreviewKeyDown += OnShortcutKey;
         RefreshButton.Click += (_, _) => BuildProjects();
         InstallButton.Click += async (_, _) => await InstallCompanion();
@@ -74,6 +74,8 @@ public partial class SettingsWindow : Window
         ThemeBox.SelectedIndex = (int)s.Theme;
         BlurSlider.Value = s.Blur;
         DarkSlider.Value = s.Darkness * 100;
+        CardSizeSlider.Value = s.CardScale * 100;
+        TextSizeSlider.Value = s.TextScale * 100;
         _loading = false;
         UpdateLookLabels();
         ShortcutNote.Text = A.ShortcutProblem ?? "";
@@ -104,6 +106,19 @@ public partial class SettingsWindow : Window
     {
         BlurLabel.Text = $"Blur: {BlurSlider.Value:0}";
         DarkLabel.Text = $"Darkness: {DarkSlider.Value:0}%";
+        CardSizeLabel.Text = $"Preview size: {CardSizeSlider.Value:0}%";
+        TextSizeLabel.Text = $"Center text size: {TextSizeSlider.Value:0}%";
+    }
+
+    /// <summary>Rebuilt on size changes; the badge shows the text staying clear of badges.</summary>
+    private void BuildSample()
+    {
+        var s = A.Settings;
+        _sample = new CardView(new CardModel("Sample Project", "index.ts", Color.FromRgb(0x3B, 0x82, 0xF6), null, "1 of 2", "Sample card"),
+            s.Blur, s.Darkness, liveBlur: true, cardScale: s.CardScale, textScale: s.TextScale);
+        _sample.Button.Focusable = false;
+        _sample.SetImage(_sampleImage ??= SyntheticEditor()); // captured previews are already blurred, so the sample uses its own image
+        SampleHost.Child = _sample.Button;
     }
 
     private void SetStartup(bool on)

@@ -28,7 +28,9 @@ public sealed class CardView
     /// True: blur with a BlurEffect (the settings sample, so the slider responds instantly). False: the image is
     /// already blurred (<see cref="Platform.Capture.Blur"/>), which keeps the software-rendered picker fast.
     /// </param>
-    public CardView(CardModel m, double blur, double darkness, bool liveBlur = false)
+    /// <param name="cardScale">Scales the whole card (preview, text, badges) proportionally.</param>
+    /// <param name="textScale">Scales only the centered alias and subtitle, on top of <paramref name="cardScale"/>.</param>
+    public CardView(CardModel m, double blur, double darkness, bool liveBlur = false, double cardScale = 1, double textScale = 1)
     {
         _liveBlur = liveBlur;
         _blur = new BlurEffect { Radius = blur, KernelType = KernelType.Gaussian, RenderingBias = RenderingBias.Performance };
@@ -49,11 +51,16 @@ public sealed class CardView
             Background = new LinearGradientBrush(Mix(m.Accent, deep, 0.62), Mix(m.Accent, deep, 0.88), new Point(0, 0), new Point(1, 1)),
         };
 
+        // Text sits between the badge rows (top/bottom 30), so it never runs under a badge; the alias gets as many
+        // lines (max 2) as fit above the subtitle, and the last one ends in an ellipsis.
+        const double textPadV = 30;
+        double lineH = 31 * textScale, subtitleH = (13 * 1.34 + 4) * textScale;
+        int lines = Math.Clamp((int)((H - 2 * textPadV - subtitleH) / lineH), 1, 2);
         TextBlock AliasText(Brush fg) => new()
         {
-            Text = m.Alias, FontSize = 25, FontWeight = FontWeights.SemiBold, Foreground = fg,
+            Text = m.Alias, FontSize = 25 * textScale, FontWeight = FontWeights.SemiBold, Foreground = fg,
             TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxHeight = 68, LineStackingStrategy = LineStackingStrategy.BlockLineHeight, LineHeight = 31,
+            MaxHeight = lines * lineH + 1, LineStackingStrategy = LineStackingStrategy.BlockLineHeight, LineHeight = lineH,
         };
         var alias = AliasText(Brushes.White);
         // A static offset copy instead of a DropShadowEffect: same legibility on bright previews, no per-frame effect cost.
@@ -64,10 +71,10 @@ public sealed class CardView
         aliasStack.Children.Add(alias);
         var subtitle = new TextBlock
         {
-            Text = m.Subtitle, FontSize = 13, Foreground = new SolidColorBrush(Color.FromArgb(0xD9, 0xFF, 0xFF, 0xFF)),
+            Text = m.Subtitle, FontSize = 13 * textScale, Foreground = new SolidColorBrush(Color.FromArgb(0xD9, 0xFF, 0xFF, 0xFF)),
             TextAlignment = TextAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 4, 0, 0),
         };
-        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 10, 16, 12) };
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, textPadV, 16, textPadV) };
         text.Children.Add(aliasStack);
         text.Children.Add(subtitle);
 
@@ -84,7 +91,8 @@ public sealed class CardView
 
         Button = new Button
         {
-            Content = grid, Width = W, Height = H, Margin = new Thickness(6),
+            Content = grid, Width = W, Height = H, Margin = new Thickness(6), // Margin isn't scaled by LayoutTransform
+            LayoutTransform = new ScaleTransform(cardScale, cardScale),
             Style = (Style)Application.Current.FindResource("CardButton"),
             RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(1, 1),
         };
