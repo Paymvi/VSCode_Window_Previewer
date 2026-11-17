@@ -37,6 +37,7 @@
                 <StackPanel>
                     <TextBlock Style="{StaticResource H}" Text="General" />
                     <CheckBox x:Name="EnabledBox" Content="Enable project previews" Margin="0,0,0,8" />
+                    <CheckBox x:Name="CloseButtonBox" Content="Show a close (X) button on each card (closes that VS Code window)" Margin="0,0,0,8" />
                     <CheckBox x:Name="StartupBox" Content="Start with Windows" />
                     <TextBlock Style="{StaticResource Note}" Margin="28,2,0,0" Text="Runs in the tray at sign-in. Off unless you turn it on." />
                 </StackPanel>

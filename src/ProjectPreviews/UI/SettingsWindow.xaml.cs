@@ -34,6 +34,8 @@ public partial class SettingsWindow : Window
 
         EnabledBox.Checked += (_, _) => Change(s => s.Enabled = true);
         EnabledBox.Unchecked += (_, _) => Change(s => s.Enabled = false);
+        CloseButtonBox.Checked += (_, _) => Change(s => s.ShowCloseButton = true, apply: false);
+        CloseButtonBox.Unchecked += (_, _) => Change(s => s.ShowCloseButton = false, apply: false);
         HoverBox.Checked += (_, _) => Change(s => s.HoverEnabled = true);
         HoverBox.Unchecked += (_, _) => Change(s => s.HoverEnabled = false);
         ShortcutBox.Checked += (_, _) => Change(s => s.ShortcutEnabled = true);
@@ -67,6 +69,7 @@ public partial class SettingsWindow : Window
         _loading = true;
         var s = A.Settings;
         EnabledBox.IsChecked = s.Enabled;
+        CloseButtonBox.IsChecked = s.ShowCloseButton;
         HoverBox.IsChecked = s.HoverEnabled;
         ShortcutBox.IsChecked = s.ShortcutEnabled;
         StartupBox.IsChecked = Startup.IsEnabled;

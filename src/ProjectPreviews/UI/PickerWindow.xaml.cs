@@ -151,11 +151,13 @@ public partial class PickerWindow : Window
             keep.Add(h);
             string? left = w.Minimized ? "Minimized" : null;
             string? right = w.DuplicateCount > 1 ? $"{w.DuplicateIndex} of {w.DuplicateCount}" : null;
-            string sig = string.Join('\u0001', w.Alias, w.Subtitle, w.Accent, left, right, s.Blur, s.Darkness, s.CardScale, s.TextScale, w.Identity.Path ?? w.Title);
+            string sig = string.Join('\u0001', w.Alias, w.Subtitle, w.Accent, left, right, s.Blur, s.Darkness, s.CardScale, s.TextScale, s.ShowCloseButton, w.Identity.Path ?? w.Title);
             if (!_cards.TryGetValue(h, out var card) || _signatures[h] != sig)
             {
                 string name = $"{w.Alias}, {w.Subtitle}{(left is null ? "" : ", minimized")}{(right is null ? "" : $", window {right}")}";
-                card = new CardView(new CardModel(w.Alias, w.Subtitle, CardView.ParseColor(w.Accent), left, right, name), s.Blur, s.Darkness, cardScale: s.CardScale, textScale: s.TextScale) { Hwnd = h };
+                card = new CardView(new CardModel(w.Alias, w.Subtitle, CardView.ParseColor(w.Accent), left, right, name), s.Blur, s.Darkness, cardScale: s.CardScale, textScale: s.TextScale,
+                    // Same as VS Code's own close: it asks about unsaved files; the destroy hook then drops the card.
+                    onClose: s.ShowCloseButton ? () => Native.PostMessage(h, Native.WM_CLOSE, 0, 0) : null) { Hwnd = h };
                 card.Button.Click += (_, _) => CardChosen?.Invoke(h);
                 card.Button.ToolTip = w.Identity.Path ?? w.Title;
                 _cards[h] = card;

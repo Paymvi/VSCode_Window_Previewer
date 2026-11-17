@@ -54,7 +54,7 @@ public static class Native
     public delegate void WinEventProc(nint hook, uint ev, nint hwnd, int idObject, int idChild, uint thread, uint time);
 
     public const int WH_MOUSE_LL = 14;
-    public const int WM_MOUSEMOVE = 0x0200, WM_LBUTTONDOWN = 0x0201, WM_RBUTTONDOWN = 0x0204, WM_MBUTTONDOWN = 0x0207, WM_QUIT = 0x0012;
+    public const int WM_MOUSEMOVE = 0x0200, WM_LBUTTONDOWN = 0x0201, WM_RBUTTONDOWN = 0x0204, WM_MBUTTONDOWN = 0x0207, WM_QUIT = 0x0012, WM_CLOSE = 0x0010;
     public const int WM_HOTKEY = 0x0312;
     public const int SW_RESTORE = 9, SW_MINIMIZE = 6, SW_SHOWNOACTIVATE = 4;
     public const uint GW_OWNER = 4;
@@ -89,6 +89,7 @@ public static class Native
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetClassName(nint hwnd, StringBuilder s, int max);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(nint hwnd, out int pid);
     [DllImport("user32.dll")] public static extern nint GetForegroundWindow();
+    [DllImport("user32.dll", EntryPoint = "PostMessageW")] public static extern bool PostMessage(nint hwnd, int msg, nint wParam, nint lParam);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(nint hwnd);
     [DllImport("user32.dll")] public static extern bool BringWindowToTop(nint hwnd);
     [DllImport("user32.dll")] public static extern bool ShowWindow(nint hwnd, int cmd);

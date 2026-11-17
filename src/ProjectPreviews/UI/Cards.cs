@@ -30,7 +30,7 @@ public sealed class CardView
     /// </param>
     /// <param name="cardScale">Scales the whole card (preview, text, badges) proportionally.</param>
     /// <param name="textScale">Scales only the centered alias and subtitle, on top of <paramref name="cardScale"/>.</param>
-    public CardView(CardModel m, double blur, double darkness, bool liveBlur = false, double cardScale = 1, double textScale = 1)
+    public CardView(CardModel m, double blur, double darkness, bool liveBlur = false, double cardScale = 1, double textScale = 1, Action? onClose = null)
     {
         _liveBlur = liveBlur;
         _blur = new BlurEffect { Radius = blur, KernelType = KernelType.Gaussian, RenderingBias = RenderingBias.Performance };
@@ -87,7 +87,15 @@ public sealed class CardView
         grid.Children.Add(text);
         grid.Children.Add(accentBar);
         if (m.BadgeLeft is not null) grid.Children.Add(Badge(m.BadgeLeft, HorizontalAlignment.Left));
-        if (m.BadgeRight is not null) grid.Children.Add(Badge(m.BadgeRight, HorizontalAlignment.Right));
+        var right = m.BadgeRight is null ? null : Badge(m.BadgeRight, HorizontalAlignment.Right);
+        if (right is not null) grid.Children.Add(right);
+        if (onClose is not null)
+        {
+            var x = CloseButton(m.Alias);
+            x.Click += (_, e) => { e.Handled = true; onClose(); };
+            grid.Children.Add(x);
+            if (right is not null) right.Margin = new Thickness(10, 10, 40, 10); // keep "1 of 2" clear of the X
+        }
 
         Button = new Button
         {
@@ -135,6 +143,26 @@ public sealed class CardView
         Background = new SolidColorBrush(Color.FromArgb(0x8C, 0, 0, 0)),
         Child = new TextBlock { Text = text, FontSize = 11, Foreground = Brushes.White },
     };
+
+    private static Button CloseButton(string alias)
+    {
+        var bg = new Border
+        {
+            Width = 24, Height = 24, CornerRadius = new CornerRadius(12), Background = new SolidColorBrush(Color.FromArgb(0x8C, 0, 0, 0)),
+            Child = new TextBlock { Text = "✕", FontSize = 11, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+        };
+        bg.MouseEnter += (_, _) => bg.Background = new SolidColorBrush(Color.FromRgb(0xC4, 0x2B, 0x1C));
+        bg.MouseLeave += (_, _) => bg.Background = new SolidColorBrush(Color.FromArgb(0x8C, 0, 0, 0));
+        // Not focusable: arrow keys keep moving between cards.
+        var b = new Button
+        {
+            Content = bg, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(8),
+            Focusable = false, Cursor = System.Windows.Input.Cursors.Hand, ToolTip = "Close window",
+            Template = new ControlTemplate(typeof(Button)) { VisualTree = new FrameworkElementFactory(typeof(ContentPresenter)) },
+        };
+        AutomationProperties.SetName(b, $"Close {alias} window");
+        return b;
+    }
 
     private static Color Mix(Color a, Color b, double t) => Color.FromRgb(
         (byte)(a.R + (b.R - a.R) * t), (byte)(a.G + (b.G - a.G) * t), (byte)(a.B + (b.B - a.B) * t));

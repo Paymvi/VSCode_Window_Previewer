@@ -30,6 +30,7 @@ public sealed class AppSettings
     public double CardScale { get; set; } = 1;
     /// <summary>Center text (alias, subtitle) size on top of the card size, 1 = original.</summary>
     public double TextScale { get; set; } = 1;
+    public bool ShowCloseButton { get; set; }
     public const double MinScale = 0.75, MaxScale = 1.5;
     public Dictionary<string, ProjectPref> Projects { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
