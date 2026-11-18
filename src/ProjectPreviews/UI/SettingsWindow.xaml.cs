@@ -231,7 +231,7 @@ public partial class SettingsWindow : Window
         {
             var w = g.First();
             seen.Add(g.Key);
-            ProjectRows.Children.Add(Row(w.Identity, g.Count(), claude));
+            ProjectRows.Children.Add(Row(w.Identity, g.Count(), claude, g.FirstOrDefault(x => !x.Minimized)?.Hwnd ?? 0));
         }
         foreach (var (key, pref) in A.Settings.Projects.Where(p => !seen.Contains(p.Key)).OrderBy(p => p.Value.Path ?? p.Key))
         {
@@ -239,7 +239,7 @@ public partial class SettingsWindow : Window
             bool ws = path.EndsWith(".code-workspace", StringComparison.OrdinalIgnoreCase);
             var id = new ProjectIdentity(ws ? ProjectKind.Workspace : ProjectKind.Folder, key, path,
                 ws ? Path.GetFileNameWithoutExtension(path) : CompanionReport.LastSegment(path), true);
-            ProjectRows.Children.Add(Row(id, 0, claude));
+            ProjectRows.Children.Add(Row(id, 0, claude, 0));
         }
         if (ProjectRows.Children.Count == 0)
             ProjectRows.Children.Add(new TextBlock { Text = "No VS Code windows are open.", Style = (Style)FindResource("Note") });
@@ -254,7 +254,8 @@ public partial class SettingsWindow : Window
         InstallButton.Content = installed ? "Reinstall companion extension" : "Install companion extension";
     }
 
-    private FrameworkElement Row(ProjectIdentity id, int openCount, IReadOnlyDictionary<string, string> claude)
+    /// <param name="hwnd">An open, non-minimized window of this project (for "Use current preview"), or 0.</param>
+    private FrameworkElement Row(ProjectIdentity id, int openCount, IReadOnlyDictionary<string, string> claude, nint hwnd)
     {
         var prefs = A.Settings.Projects;
         string? key = id.Key;
@@ -279,6 +280,25 @@ public partial class SettingsWindow : Window
         AutomationProperties.SetName(color, $"Accent color for {label}");
         AutomationProperties.SetName(reset, $"Reset alias and color for {label}");
 
+        var thumb = new Border
+        {
+            Width = 64, Height = 36, CornerRadius = new CornerRadius(5), Margin = new Thickness(0, 0, 8, 0),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(0x40, 0x80, 0x80, 0x80)), BorderThickness = new Thickness(1),
+        };
+        var choose = new Button { Margin = new Thickness(0, 0, 6, 0), Padding = new Thickness(10, 3, 10, 3), IsEnabled = key is not null };
+        var fromPreview = new Button
+        {
+            Content = "Use current preview", Margin = new Thickness(0, 0, 6, 0), Padding = new Thickness(10, 3, 10, 3), IsEnabled = key is not null && hwnd != 0,
+            ToolTip = hwnd != 0 ? "Save a still image of this project's window as its background" : "Open this project in a (non-minimized) VS Code window first",
+        };
+        ToolTipService.SetShowOnDisabled(fromPreview, true);
+        var clear = new Button { Content = "Clear", Padding = new Thickness(10, 3, 10, 3) };
+        var bgNote = new TextBlock { Style = (Style)FindResource("Note"), Margin = new Thickness(2, 4, 0, 0) };
+        AutomationProperties.SetName(choose, $"Choose background image for {label}");
+        AutomationProperties.SetName(fromPreview, $"Use current preview as background for {label}");
+        AutomationProperties.SetName(clear, $"Clear background image for {label}");
+        string? Background() => key is not null && prefs.TryGetValue(key, out var pb) ? pb.Background : null;
+
         void Refresh()
         {
             var (shown, source) = Aliases.Resolve(id, prefs, claude);
@@ -295,7 +315,34 @@ public partial class SettingsWindow : Window
                 ? $"Shown as “{shown}” ({from}) · {(id.Kind == ProjectKind.Empty ? "no folder open" : "exact path unknown, so no alias can be saved; the companion extension fixes this")}{open}"
                 : $"Shown as “{shown}” ({from}) · {where}{open}";
             note.ToolTip = id.Path;
-            reset.IsEnabled = key is not null && prefs.ContainsKey(key);
+            reset.IsEnabled = key is not null && prefs.TryGetValue(key, out var pr) && (pr.Alias is not null || pr.Color is not null);
+            string? bg = Background();
+            var img = bg is null ? null : Capture.LoadBackground(bg, 160);
+            thumb.Background = img is null ? null : new ImageBrush(img) { Stretch = Stretch.UniformToFill };
+            thumb.Visibility = img is null ? Visibility.Collapsed : Visibility.Visible;
+            choose.Content = bg is null ? "Choose background…" : "Replace background…";
+            clear.Visibility = bg is null ? Visibility.Collapsed : Visibility.Visible;
+            bgNote.Text = bg is not null && img is null ? "Background image is missing; the window preview is shown." : "";
+        }
+
+        void SetBackground(string? path)
+        {
+            if (key is null) return;
+            var p = prefs.TryGetValue(key, out var e) ? e : new ProjectPref();
+            string? old = p.Background;
+            p.Background = path;
+            p.Path = id.Path ?? p.Path;
+            if (p.IsEmpty) prefs.Remove(key); else prefs[key] = p;
+            A.SaveSettings();
+            if (old != path) Capture.DeleteBackground(old);
+            Refresh();
+        }
+
+        void SaveAsBackground(BitmapSource? img, string failure)
+        {
+            if (img is null) { bgNote.Text = failure; return; }
+            try { SetBackground(Capture.SaveBackground(img)); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { bgNote.Text = "Couldn't save the image: " + ex.Message; }
         }
 
         void Commit(string? newAlias, string? newColor)
@@ -305,7 +352,7 @@ public partial class SettingsWindow : Window
             p.Alias = string.IsNullOrWhiteSpace(newAlias) ? null : newAlias.Trim();
             p.Color = newColor;
             p.Path = id.Path ?? p.Path;
-            if (p.Alias is null && p.Color is null) prefs.Remove(key); else prefs[key] = p;
+            if (p.IsEmpty) prefs.Remove(key); else prefs[key] = p;
             A.SaveSettings();
             Refresh();
         }
@@ -317,17 +364,26 @@ public partial class SettingsWindow : Window
         reset.Click += (_, _) =>
         {
             if (key is null) return;
-            prefs.Remove(key);
-            A.SaveSettings();
             alias.Text = "";
             color.SelectedIndex = 0;
-            Refresh();
+            Commit(null, null); // the background has its own Clear
         };
+        choose.Click += (_, _) =>
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog { Title = $"Background for {label}", Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp;*.tif;*.tiff|All files|*.*" };
+            if (dlg.ShowDialog(this) == true) SaveAsBackground(Capture.LoadBackground(dlg.FileName, 0), "Couldn't read that image.");
+        };
+        fromPreview.Click += (_, _) => SaveAsBackground(Capture.Snapshot(hwnd), "Couldn't capture the window (it may be minimized or closed). Try Refresh.");
+        clear.Click += (_, _) => SetBackground(null);
         Refresh();
 
+        var bgRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
+        foreach (var e in new FrameworkElement[] { thumb, choose, fromPreview, clear }) bgRow.Children.Add(e);
         var mid = new StackPanel();
         mid.Children.Add(alias);
         mid.Children.Add(note);
+        mid.Children.Add(bgRow);
+        mid.Children.Add(bgNote);
         Grid.SetColumn(mid, 1);
         Grid.SetColumn(reset, 2);
         grid.Children.Add(color);

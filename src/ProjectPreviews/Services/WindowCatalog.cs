@@ -15,6 +15,8 @@ public sealed class ProjectWindow
     public required string Alias { get; init; }
     public required AliasSource Source { get; init; }
     public required string Accent { get; init; }
+    /// <summary>Project background image path, shown instead of the window capture.</summary>
+    public string? Background { get; init; }
     public bool FromCompanion { get; init; }
     /// <summary>The companion report bound to this window (its extension host PID and window session id), if any.</summary>
     public CompanionReport? Report { get; init; }
@@ -146,11 +148,13 @@ public sealed class WindowCatalog : IDisposable
                 (id, file) = FromTitle(w.Title, known, knownNames);
             }
             var (alias, source) = Aliases.Resolve(id, settings.Projects, claude);
-            string? color = id.Key is not null && settings.Projects.TryGetValue(id.Key, out var p) ? p.Color : null;
+            var pref = id.Key is not null && settings.Projects.TryGetValue(id.Key, out var p) ? p : null;
+            string? color = pref?.Color;
             result.Add(new ProjectWindow
             {
                 Hwnd = w.Hwnd, Title = w.Title, Minimized = Native.IsIconic(w.Hwnd), Identity = id, ActiveFile = file,
                 Alias = alias, Source = source, Accent = color ?? Aliases.DefaultAccent(id.Key ?? id.Name), FromCompanion = companion, Report = rep,
+                Background = pref?.Background,
             });
         }
         Disambiguate(result);

@@ -104,6 +104,7 @@ public partial class PickerWindow : Window
     }
 
     private readonly Dictionary<nint, string> _signatures = [];
+    private readonly Dictionary<nint, bool> _hasBackground = [];
     private IReadOnlyDictionary<nint, List<WorkerChip>> _workers = new Dictionary<nint, List<WorkerChip>>();
     private WorkerStyle _workerStyle;
     private string _headerBase = "", _workerNote = "", _workerNoteTip = "";
@@ -190,12 +191,16 @@ public partial class PickerWindow : Window
                 _signatures[h] = sig;
                 card.SetWorkers(_workers.GetValueOrDefault(h) ?? [], _workerStyle);
             }
-            card.SetImage(!w.Minimized && images.TryGetValue(h, out var img) ? img : null);
+            // A project background stands in for the live capture (and also shows while minimized).
+            var bg = w.Background is null ? null : Capture.BlurredBackground(w.Background, s.Blur);
+            _hasBackground[h] = bg is not null;
+            card.SetImage(bg ?? (!w.Minimized && images.TryGetValue(h, out var img) ? img : null));
         }
         foreach (var gone in _cards.Keys.Where(h => !keep.Contains(h)).ToList())
         {
             _cards.Remove(gone);
             _signatures.Remove(gone);
+            _hasBackground.Remove(gone);
         }
     }
 
@@ -210,7 +215,7 @@ public partial class PickerWindow : Window
 
     public void SetImage(nint hwnd, BitmapSource image)
     {
-        if (_cards.TryGetValue(hwnd, out var c)) c.SetImage(image);
+        if (_cards.TryGetValue(hwnd, out var c) && !_hasBackground.GetValueOrDefault(hwnd)) c.SetImage(image);
     }
 
     public void ShowProblem(string text)

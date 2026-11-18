@@ -78,6 +78,68 @@ public static class Capture
         return bmp;
     }
 
+    /// <summary>
+    /// Saves a project background as a new JPEG under <see cref="Core.SettingsStore.BackgroundsDir"/> (downscaled;
+    /// it's shown blurred) and returns its path. A new name each time, so a replaced image is never served from cache.
+    /// </summary>
+    public static string SaveBackground(BitmapSource src)
+    {
+        const int maxW = 1280;
+        if (src.PixelWidth > maxW) src = new TransformedBitmap(src, new ScaleTransform(maxW / (double)src.PixelWidth, maxW / (double)src.PixelWidth));
+        if (src.Format != PixelFormats.Bgr32 && src.Format != PixelFormats.Bgra32) src = new FormatConvertedBitmap(src, PixelFormats.Bgr32, null, 0);
+        Directory.CreateDirectory(Core.SettingsStore.BackgroundsDir);
+        string path = Path.Combine(Core.SettingsStore.BackgroundsDir, $"{Guid.NewGuid():N}.jpg");
+        var enc = new JpegBitmapEncoder { QualityLevel = 90 };
+        enc.Frames.Add(BitmapFrame.Create(src));
+        using (var f = File.Create(path)) enc.Save(f);
+        return path;
+    }
+
+    /// <summary>Deletes a background only if the app made it (a hand-edited path elsewhere is left alone).</summary>
+    public static void DeleteBackground(string? path)
+    {
+        if (path is null || !string.Equals(Path.GetDirectoryName(Path.GetFullPath(path)), Path.GetFullPath(Core.SettingsStore.BackgroundsDir), StringComparison.OrdinalIgnoreCase)) return;
+        try { File.Delete(path); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Log.Write($"background delete: {e.Message}"); }
+    }
+
+    /// <summary>Decodes a background file (not locked afterwards); null if missing or unreadable.</summary>
+    public static BitmapSource? LoadBackground(string path, int decodeWidth = MaxWidth)
+    {
+        try
+        {
+            var bmp = new BitmapImage();
+            bmp.BeginInit();
+            bmp.UriSource = new Uri(path);
+            bmp.DecodePixelWidth = decodeWidth;
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+            bmp.EndInit();
+            bmp.Freeze();
+            return bmp;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException or UriFormatException or ArgumentException or InvalidOperationException)
+        {
+            Log.Write($"background load {path}: {e.Message}");
+            return null;
+        }
+    }
+
+    private static readonly Dictionary<string, (double Blur, BitmapSource? Image)> Backgrounds = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The background pre-blurred like a capture, cached per path (paths are never reused). UI thread only.</summary>
+    public static BitmapSource? BlurredBackground(string path, double blur)
+    {
+        if (Backgrounds.TryGetValue(path, out var c) && c.Blur == blur) return c.Image;
+        var img = LoadBackground(path);
+        if (img is not null)
+        {
+            var bgra = new FormatConvertedBitmap(img, PixelFormats.Bgra32, null, 0);
+            img = Blur(bgra, blur * bgra.PixelWidth / UI.CardView.W);
+        }
+        Backgrounds[path] = (blur, img);
+        return img;
+    }
+
     /// <summary>Box radii whose three passes approximate a Gaussian of <paramref name="sigma"/> (Kovesi's method).</summary>
     internal static int[] BoxRadii(double sigma, int n)
     {

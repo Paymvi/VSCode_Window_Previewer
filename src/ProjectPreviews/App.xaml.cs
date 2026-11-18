@@ -360,7 +360,7 @@ public partial class App : Application
         int gen = ++_captureGen;
         Task.Delay(delay).ContinueWith(_ =>
         {
-            if (gen == _captureGen && _picker.IsOpen) StartCaptures(windows.Where(w => !w.Minimized).Select(w => w.Hwnd));
+            if (gen == _captureGen && _picker.IsOpen) StartCaptures(windows.Where(w => !w.Minimized && w.Background is null).Select(w => w.Hwnd));
         }, TaskScheduler.FromCurrentSynchronizationContext());
     }
 
@@ -475,7 +475,7 @@ public partial class App : Application
         _picker.Present(windows, Settings, _picker.Mode, _picker.Mode == PickerMode.Hover ? _hoverButton : null, _images, keepOrder: true);
         ShownWindows(windows);
         StartLiveHooks(windows);
-        StartCaptures(windows.Where(w => !w.Minimized && !known.Contains(w.Hwnd)).Select(w => w.Hwnd));
+        StartCaptures(windows.Where(w => !w.Minimized && w.Background is null && !known.Contains(w.Hwnd)).Select(w => w.Hwnd));
     }
 
     private void StartCaptures(IEnumerable<nint> hwnds)

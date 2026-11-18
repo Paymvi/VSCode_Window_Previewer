@@ -198,6 +198,17 @@ public class SettingsTests
         Assert.Equal(7, back.Blur);
         Assert.Equal("Site", back.Projects[@"c:\work\site"].Alias);
     }
+
+    [Fact]
+    public void Background_only_project_survives_round_trip()
+    {
+        string path = TempFile();
+        var s = new AppSettings();
+        s.Projects[@"c:\work\site"] = new ProjectPref { Background = @"C:\bg\site.jpg" };
+        SettingsStore.Save(path, s);
+        Assert.DoesNotContain("IsEmpty", File.ReadAllText(path));
+        Assert.Equal(@"C:\bg\site.jpg", SettingsStore.Load(path, out _).Projects[@"c:\work\site"].Background);
+    }
 }
 
 public class TitleTests

@@ -9,6 +9,9 @@ public sealed class ProjectPref
     public string? Color { get; set; }
     /// <summary>Original-case path, for display only (the dictionary key is normalized).</summary>
     public string? Path { get; set; }
+    /// <summary>Card background image (a copy under the app's backgrounds folder); null keeps the live window capture.</summary>
+    public string? Background { get; set; }
+    [JsonIgnore] public bool IsEmpty => Alias is null && Color is null && Background is null;
 }
 
 public enum ThemeChoice { System, Light, Dark }
@@ -56,7 +59,8 @@ public sealed class AppSettings
             if (string.IsNullOrWhiteSpace(k) || v is null) continue;
             if (v.Color is not null && !IsColor(v.Color)) v.Color = null;
             if (string.IsNullOrWhiteSpace(v.Alias)) v.Alias = null;
-            if (v.Alias is null && v.Color is null) continue;
+            if (string.IsNullOrWhiteSpace(v.Background)) v.Background = null;
+            if (v.IsEmpty) continue;
             projects[Aliases.NormalizeKey(k)] = v;
         }
         Projects = projects;
@@ -69,6 +73,7 @@ public sealed class AppSettings
 public static class SettingsStore
 {
     public static string DefaultPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ProjectPreviews", "settings.json");
+    public static string BackgroundsDir => Path.Combine(Path.GetDirectoryName(DefaultPath)!, "backgrounds");
 
     private static readonly JsonSerializerOptions Options = new()
     {
