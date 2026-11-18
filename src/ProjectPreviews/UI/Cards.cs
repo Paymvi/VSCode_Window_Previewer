@@ -62,10 +62,12 @@ public sealed class CardView
             TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis,
             MaxHeight = lines * lineH + 1, LineStackingStrategy = LineStackingStrategy.BlockLineHeight, LineHeight = lineH,
         };
+        _lineH = lineH; _subtitleH = subtitleH;
         var alias = AliasText(Brushes.White);
         // A static offset copy instead of a DropShadowEffect: same legibility on bright previews, no per-frame effect cost.
         var aliasShadow = AliasText(new SolidColorBrush(Color.FromArgb(0x8C, 0, 0, 0)));
         aliasShadow.RenderTransform = new TranslateTransform(0, 1.5);
+        _alias = alias; _aliasShadow = aliasShadow;
         var aliasStack = new Grid();
         aliasStack.Children.Add(aliasShadow);
         aliasStack.Children.Add(alias);
@@ -77,10 +79,11 @@ public sealed class CardView
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, textPadV, 16, textPadV) };
         text.Children.Add(aliasStack);
         text.Children.Add(subtitle);
+        _text = text;
 
         var accentBar = new Rectangle { Height = 4, VerticalAlignment = VerticalAlignment.Bottom, Fill = new SolidColorBrush(m.Accent) };
 
-        var grid = new Grid { Width = W, Height = H, Clip = new RectangleGeometry(new Rect(0, 0, W, H), Radius, Radius) };
+        var grid = _grid = new Grid { Width = W, Height = H, Clip = new RectangleGeometry(new Rect(0, 0, W, H), Radius, Radius) };
         grid.Children.Add(_fallback);
         grid.Children.Add(_image);
         grid.Children.Add(_shade);
@@ -104,7 +107,7 @@ public sealed class CardView
             Style = (Style)Application.Current.FindResource("CardButton"),
             RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(1, 1),
         };
-        AutomationProperties.SetName(Button, m.AccessibleName);
+        AutomationProperties.SetName(Button, _name = m.AccessibleName);
         Button.ToolTip = null;
         if (ThemeManager.MotionAllowed)
         {
@@ -127,6 +130,32 @@ public sealed class CardView
     }
 
     private readonly bool _liveBlur;
+    private readonly Grid _grid;
+    private readonly StackPanel _text;
+    private readonly TextBlock _alias, _aliasShadow;
+    private readonly double _lineH, _subtitleH;
+    private readonly string _name;
+    private FrameworkElement? _workers;
+    private string _workerSig = "";
+
+    /// <summary>
+    /// Worker chips along the bottom (none: no space taken). The alias gives up its second line when they need the
+    /// room, so chips never cover the alias, subtitle or badges.
+    /// </summary>
+    public void SetWorkers(IReadOnlyList<Core.WorkerChip> chips, Core.WorkerStyle style)
+    {
+        string sig = style + "|" + string.Join(";", chips.Select(c => $"{c.Label}|{c.Status}|{c.Tone}|{c.Look}|{c.State}|{c.Tooltip}"));
+        if (sig == _workerSig) return;
+        _workerSig = sig;
+        if (_workers is not null) _grid.Children.Remove(_workers);
+        _workers = WorkerChips.Strip(chips, style, out double height);
+        if (_workers is not null) _grid.Children.Add(_workers);
+        double bottom = Math.Max(30, height + 4);
+        int lines = Math.Clamp((int)((H - 30 - bottom - _subtitleH) / _lineH), 1, 2);
+        _alias.MaxHeight = _aliasShadow.MaxHeight = lines * _lineH + 1;
+        _text.Margin = new Thickness(16, 30, 16, bottom);
+        AutomationProperties.SetName(Button, chips.Count == 0 ? _name : $"{_name}. AI workers: {string.Join(", ", chips.Select(c => $"{c.Label} {c.Status}"))}");
+    }
 
     private void Scale(double to)
     {

@@ -53,6 +53,12 @@ public partial class SettingsWindow : Window
         CardSizeSlider.ValueChanged += (_, e) => { UpdateLookLabels(); if (!_loading) { Change(s => s.CardScale = Math.Round(e.NewValue) / 100, apply: false); BuildSample(); } };
         TextSizeSlider.ValueChanged += (_, e) => { UpdateLookLabels(); if (!_loading) { Change(s => s.TextScale = Math.Round(e.NewValue) / 100, apply: false); BuildSample(); } };
         ResetSizesButton.Click += (_, _) => { CardSizeSlider.Value = 100; TextSizeSlider.Value = 100; };
+        WorkersBox.Checked += (_, _) => ChangeWorkers(s => s.ShowWorkers = true);
+        WorkersBox.Unchecked += (_, _) => ChangeWorkers(s => s.ShowWorkers = false);
+        StyleCreatures.Checked += (_, _) => ChangeWorkers(s => s.WorkerStyle = WorkerStyle.Creatures);
+        StyleIndicators.Checked += (_, _) => ChangeWorkers(s => s.WorkerStyle = WorkerStyle.Indicators);
+        A.WorkerStatus.Changed += UpdateWorkerNote;
+        Closed += (_, _) => A.WorkerStatus.Changed -= UpdateWorkerNote;
         ShortcutText.PreviewKeyDown += OnShortcutKey;
         RefreshButton.Click += (_, _) => BuildProjects();
         InstallButton.Click += async (_, _) => await InstallCompanion();
@@ -79,7 +85,11 @@ public partial class SettingsWindow : Window
         DarkSlider.Value = s.Darkness * 100;
         CardSizeSlider.Value = s.CardScale * 100;
         TextSizeSlider.Value = s.TextScale * 100;
+        WorkersBox.IsChecked = s.ShowWorkers;
+        StyleCreatures.IsChecked = s.WorkerStyle == WorkerStyle.Creatures;
+        StyleIndicators.IsChecked = s.WorkerStyle == WorkerStyle.Indicators;
         _loading = false;
+        UpdateWorkerControls();
         UpdateLookLabels();
         ShortcutNote.Text = A.ShortcutProblem ?? "";
         ShortcutNote.Visibility = A.ShortcutProblem is null ? Visibility.Collapsed : Visibility.Visible;
@@ -105,6 +115,50 @@ public partial class SettingsWindow : Window
         ShortcutNote.Visibility = A.ShortcutProblem is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
+    private void ChangeWorkers(Action<AppSettings> edit)
+    {
+        if (_loading) return;
+        Change(edit, apply: false);
+        A.ApplyWorkers(); // starts/stops monitoring and redraws an open picker right away
+        UpdateWorkerControls();
+        BuildSample();
+    }
+
+    private void UpdateWorkerControls()
+    {
+        bool on = A.Settings.ShowWorkers;
+        WorkerStylePanel.IsEnabled = WorkerStyleLabel.IsEnabled = on;
+        WorkerStyleLabel.Opacity = WorkerStylePanel.Opacity = on ? 1 : 0.5;
+        UpdateWorkerNote();
+    }
+
+    private void UpdateWorkerNote()
+    {
+        var src = A.WorkerStatus;
+        var notes = new List<string>();
+        if (!A.Settings.ShowWorkers) notes.Add("Off: nothing is monitored.");
+        else if (!A.Settings.Enabled) notes.Add("Previews are disabled, so nothing is monitored.");
+        else if (!src.HasData) notes.Add("Reading status…");
+        else if (!src.Current.Available) notes.Add($"AI Status Indicator's status files weren't found ({src.SessionsDir}). Install AI Status Indicator; its hooks write them.");
+        else
+        {
+            int n = src.Current.Workers.Count;
+            notes.Add(n == 0 ? "Connected. No Claude Code or Codex workers are running right now." : $"Connected. {n} worker{(n == 1 ? "" : "s")} running right now (cards show those inside VS Code windows).");
+        }
+        if (A.Settings.ShowWorkers && A.Settings.WorkerStyle == WorkerStyle.Creatures && WorkerChips.Sheet is null)
+            notes.Add($"Creature art wasn't found ({WorkerChips.SheetPath}), so status indicators are shown instead.");
+        if (A.Settings.ShowWorkers && !CodexHooksInstalled())
+            notes.Add("Codex workers appear once AI Status Indicator's Codex hooks are installed (re-run its install.ps1) and trusted in Codex.");
+        WorkerStatusNote.Text = string.Join(" ", notes);
+    }
+
+    private static bool CodexHooksInstalled()
+    {
+        string home = Environment.GetEnvironmentVariable("CODEX_HOME") is { Length: > 0 } h ? h : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".codex");
+        try { return File.ReadAllText(Path.Combine(home, "hooks.json")).Contains("status-indicator/hook.ps1", StringComparison.OrdinalIgnoreCase); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return !Directory.Exists(home); } // no Codex: nothing to say
+    }
+
     private void UpdateLookLabels()
     {
         BlurLabel.Text = $"Blur: {BlurSlider.Value:0}";
@@ -121,6 +175,11 @@ public partial class SettingsWindow : Window
             s.Blur, s.Darkness, liveBlur: true, cardScale: s.CardScale, textScale: s.TextScale);
         _sample.Button.Focusable = false;
         _sample.SetImage(_sampleImage ??= SyntheticEditor()); // captured previews are already blurred, so the sample uses its own image
+        if (s.ShowWorkers)
+            _sample.SetWorkers([
+                new WorkerChip("Claude", "Working", WorkerTone.Working, "Claude Code · sample\nWorking · 04:32", WorkerProvider.Claude, 0, WorkerSession.Working),
+                new WorkerChip("Codex", "Approval", WorkerTone.Attention, "Codex · sample\nNeeds approval · waiting 2m", WorkerProvider.Codex, 5 * 13 + 3, WorkerSession.NeedsYou),
+            ], s.WorkerStyle);
         SampleHost.Child = _sample.Button;
     }
 

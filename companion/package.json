@@ -1,8 +1,8 @@
 {
   "name": "project-previews-companion",
   "displayName": "Project Previews Companion",
-  "description": "Tells the Project Previews desktop app which folder each VS Code window has open, so its window picker can show the right project name. Local only.",
-  "version": "1.0.0",
+  "description": "Tells the Project Previews desktop app which folder each VS Code window has open, so its window picker can show the right project name, and marks its terminals so AI worker status lands on the right window. Local only.",
+  "version": "1.1.0",
   "publisher": "projectpreviews",
   "license": "MIT",
   "engines": { "vscode": "^1.75.0" },

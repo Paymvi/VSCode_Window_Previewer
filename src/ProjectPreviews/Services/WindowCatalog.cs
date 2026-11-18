@@ -16,6 +16,8 @@ public sealed class ProjectWindow
     public required AliasSource Source { get; init; }
     public required string Accent { get; init; }
     public bool FromCompanion { get; init; }
+    /// <summary>The companion report bound to this window (its extension host PID and window session id), if any.</summary>
+    public CompanionReport? Report { get; init; }
     /// <summary>1-based position among windows of the same project, and how many there are (for "2 of 3" badges).</summary>
     public int DuplicateIndex { get; set; }
     public int DuplicateCount { get; set; }
@@ -59,6 +61,8 @@ public sealed class WindowCatalog : IDisposable
 
     public ClaudeWorkersAliases ClaudeWorkers => _claude;
     public int CompanionWindowCount { get; private set; }
+    /// <summary>Live companion reports from the last snapshot, bound to a window or not.</summary>
+    public IReadOnlyList<CompanionReport> Reports { get; private set; } = [];
 
     public void StartTracking()
     {
@@ -115,6 +119,7 @@ public sealed class WindowCatalog : IDisposable
         var reports = LoadReports();
         CompanionWindowCount = reports.Count;
         var bound = Binder.Bind(raw, reports, _focus, _sticky, Native.GetForegroundWindow());
+        Reports = reports;
         var settings = _settings();
         var claude = _claude.Current;
         List<string> known = [];
@@ -145,7 +150,7 @@ public sealed class WindowCatalog : IDisposable
             result.Add(new ProjectWindow
             {
                 Hwnd = w.Hwnd, Title = w.Title, Minimized = Native.IsIconic(w.Hwnd), Identity = id, ActiveFile = file,
-                Alias = alias, Source = source, Accent = color ?? Aliases.DefaultAccent(id.Key ?? id.Name), FromCompanion = companion,
+                Alias = alias, Source = source, Accent = color ?? Aliases.DefaultAccent(id.Key ?? id.Name), FromCompanion = companion, Report = rep,
             });
         }
         Disambiguate(result);

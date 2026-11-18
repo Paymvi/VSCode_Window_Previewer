@@ -51,6 +51,8 @@ measurements and the full validation log are in [IMPLEMENTATION_NOTES.md](../IMP
 Read-only, never modified:
 
 - `%USERPROFILE%\.claude\status-indicator\config.json` (Claude Workers aliases).
+- `%USERPROFILE%\.claude\status-indicator\state\sessions\*.json`, `state\activity\tick\*` and `workers.png`
+  (AI worker status, only while **Show AI worker status** is on; see below). `CLAUDE_CONFIG_DIR` is honored.
 - `%APPDATA%\Code\User\globalStorage\storage.json` (VS Code's list of open folders; used only without the companion).
 
 ## How names are chosen
@@ -102,12 +104,13 @@ Mechanism details and edge cases: [IMPLEMENTATION_NOTES.md → Window identity](
 
 | | |
 | --- | --- |
-| ID | `projectpreviews.project-previews-companion` 1.0.0 |
+| ID | `projectpreviews.project-previews-companion` 1.1.0 |
 | Source | `companion/extension.js`, `companion/package.json` (plain JavaScript, no dependencies) |
 | Package | `publish\ProjectPreviews\companion\project-previews-companion.vsix`, built offline by `tools\pack-companion.ps1` |
 | Runs | In each local VS Code window (`extensionKind: ui`), after startup (`onStartupFinished`). Allowed in Restricted Mode. |
 | Writes | `%LOCALAPPDATA%\ProjectPreviews\windows\<session>.json`: workspace name, workspace file path, folder paths/URIs, active tab name, focused flag and timestamps, extension-host process ID |
 | Updates on | Window focus changes, tab changes, active editor changes, workspace folder changes |
+| Terminals | Sets `PROJECT_PREVIEWS_WINDOW` = the window's session id (opaque, new on every VS Code start) in that window's new terminals, via `environmentVariableCollection` (not persisted). Used only to match AI workers started in a terminal. |
 | Never | Reads file contents, terminal output or chat. Makes no network requests. |
 
 Installing:
@@ -122,6 +125,52 @@ When it was installed during testing, all already-open windows started reporting
 reload. If a window still isn't identified, run *Developer: Reload Window* in it.
 
 Uninstall: `code --uninstall-extension projectpreviews.project-previews-companion`, or from the Extensions view.
+
+## AI worker status
+
+Off by default (`ShowWorkers: false`, `WorkerStyle: "Creatures"` in `settings.json`).
+
+**Source.** AI Status Indicator's hook (`hook.ps1`) runs inside every Claude Code and Codex lifecycle event and
+writes one small file per session to `state\sessions\<session id>.json`. That is the shared status source: it
+doesn't depend on the indicator window, so status keeps updating while that window is closed. Project Previews
+starts no collector or background process of its own. It only reads these files (never writes or deletes them).
+The format is documented in AI Status Indicator's README (*Shared status files*). Fields used: `state`, `event`,
+`detail`, `updated`, `state_since`, `first_seen`, `claude_pid` + `claude_started` (process identity),
+`provider`, `vscode`, `vscode_window`. Prompts and conversation content are never in these files.
+
+**When it reads.** While the setting is on: a `FileSystemWatcher` on that folder (debounced 200 ms) plus, only while
+the picker is open, a re-check every 3 s (a process exit writes no file). With the folder missing, it retries every
+30 s. All file and process work runs on a background thread. Turning the setting off disposes the watcher and
+timers. AI Status Indicator itself is unaffected.
+
+**Which workers are shown.**
+
+- The worker's process (PID + start time, so a reused PID never counts) must still be running. When it can't be
+  checked, the indicator's rule applies: active states older than 24 h are dropped.
+- One process is one Claude Code worker. Older sessions a Claude process left behind (e.g. after `/clear`) are
+  hidden. A Codex app-server runs several threads, so all its active threads show, plus the latest finished one.
+- `WORKING` with no update and no hook heartbeat (`state\activity\tick\<id>`, written at most every 2 min while
+  tools run) for 20 min shows as **Quiet**, so old data isn't presented as Working.
+
+**Matching to a card (exact identifiers only, never folder names or titles).**
+
+1. *Process ancestry*: the worker's verified parent chain (each parent must have started before its child) contains
+   a window's extension-host PID, as reported by the companion. This covers the Claude Code and Codex extensions,
+   which run their agent as a child of that window's extension host. Two windows showing the same folder have
+   different extension hosts, so they are told apart.
+2. *Window id*: agents started in an integrated terminal record `PROJECT_PREVIEWS_WINDOW` (set by the companion) as
+   `vscode_window`, which must equal a live report's session id.
+
+A worker marked as running in VS Code that matches neither, or matches a report not bound to a card, is counted in the
+header (*N AI workers not matched to a window*) and not shown on any card. Workers outside VS Code (e.g. Windows
+Terminal) are ignored. *AI status unavailable* means the status folder is missing or unreadable, which is different
+from having no workers.
+
+**Display.** Creatures are cropped from AI Status Indicator's `workers.png` with the same cell formula as its
+`WorkerArt.Draw` (column = look % 13, row = pose × 8 + look ÷ 13; poses: working, needs you, done, error). If
+the sheet is missing, status indicators are used. Motion is one shared transform toggled twice a second (a 1-pixel
+bob, as on the phone dashboard), running only while the picker shows a working creature and Windows' animation
+effects are on. This avoids per-frame animation in the software-rendered popup.
 
 ## Taskbar integration
 

@@ -31,6 +31,7 @@ public partial class PickerWindow : Window
         // window. It's fast enough because nothing in the picker uses effects (previews are pre-blurred).
         HwndSource.FromHwnd(_hwnd).CompositionTarget.RenderMode = RenderMode.SoftwareOnly;
         PreviewKeyDown += OnKey;
+        IsVisibleChanged += (_, _) => { if (!IsVisible) WorkerChips.Animate(false); };
         Deactivated += (_, _) => { if (IsVisible && Mode == PickerMode.Keyboard) DismissRequested?.Invoke(); };
         Tab.MouseDown += (_, e) =>
         {
@@ -72,7 +73,8 @@ public partial class PickerWindow : Window
         Build(_order.Select(h => byHwnd[h]), s, images);
         CardsPanel.Children.Clear();
         foreach (var h in _order) CardsPanel.Children.Add(_cards[h].Button);
-        Header.Text = $"Visual Studio Code · {windows.Count} window{(windows.Count == 1 ? "" : "s")}";
+        _headerBase = $"Visual Studio Code · {windows.Count} window{(windows.Count == 1 ? "" : "s")}";
+        ShowHeader();
         Hint.Text = mode == PickerMode.Keyboard ? "Arrows to move · Enter to switch · Esc to close" : "Click to switch";
         Header.ClearValue(TextBlock.ForegroundProperty);
 
@@ -102,6 +104,30 @@ public partial class PickerWindow : Window
     }
 
     private readonly Dictionary<nint, string> _signatures = [];
+    private IReadOnlyDictionary<nint, List<WorkerChip>> _workers = new Dictionary<nint, List<WorkerChip>>();
+    private WorkerStyle _workerStyle;
+    private string _headerBase = "", _workerNote = "", _workerNoteTip = "";
+
+    /// <summary>
+    /// Worker chips per card (empty map = feature off: no chips, no space). <paramref name="note"/> is a short, subtle
+    /// header addition such as "AI status unavailable" or "1 worker not matched to a window".
+    /// </summary>
+    public void SetWorkers(IReadOnlyDictionary<nint, List<WorkerChip>> byWindow, WorkerStyle style, string note, string noteTip)
+    {
+        _workers = byWindow;
+        _workerStyle = style;
+        _workerNote = note;
+        _workerNoteTip = noteTip;
+        foreach (var (h, card) in _cards) card.SetWorkers(byWindow.GetValueOrDefault(h) ?? [], style);
+        if (Header.ReadLocalValue(TextBlock.ForegroundProperty) == DependencyProperty.UnsetValue) ShowHeader(); // keep a ShowProblem message
+        WorkerChips.Animate(IsOpen && WorkerChips.WantsMotion(byWindow.Values.SelectMany(v => v), style));
+    }
+
+    private void ShowHeader()
+    {
+        Header.Text = _workerNote.Length == 0 ? _headerBase : $"{_headerBase} · {_workerNote}";
+        Header.ToolTip = _workerNoteTip.Length == 0 ? null : _workerNoteTip;
+    }
 
     /// <summary>Builds card visuals ahead of time (or reuses unchanged ones), so showing is just layout. Safe while hidden.</summary>
     public void Prewarm(IReadOnlyList<ProjectWindow> windows, AppSettings s, IReadOnlyDictionary<nint, BitmapSource> images)
@@ -162,6 +188,7 @@ public partial class PickerWindow : Window
                 card.Button.ToolTip = w.Identity.Path ?? w.Title;
                 _cards[h] = card;
                 _signatures[h] = sig;
+                card.SetWorkers(_workers.GetValueOrDefault(h) ?? [], _workerStyle);
             }
             card.SetImage(!w.Minimized && images.TryGetValue(h, out var img) ? img : null);
         }

@@ -90,6 +90,21 @@
                 </WrapPanel>
             </Border>
 
+            <!-- AI workers -->
+            <Border Style="{StaticResource Section}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource H}" Text="AI workers" />
+                    <CheckBox x:Name="WorkersBox" Content="Show AI worker status" />
+                    <TextBlock Style="{StaticResource Note}" Margin="28,2,0,10" Text="Shows Claude Code and Codex sessions inside the card of the VS Code window they run in. The status comes from AI Status Indicator's local status files (its hooks write them, also while its window is closed). Nothing is sent anywhere." />
+                    <TextBlock x:Name="WorkerStyleLabel" Text="Worker display style" Margin="28,0,0,4" />
+                    <StackPanel x:Name="WorkerStylePanel" Orientation="Horizontal" Margin="28,0,0,0" AutomationProperties.Name="Worker display style">
+                        <RadioButton x:Name="StyleCreatures" Content="Creatures" GroupName="WorkerStyle" Margin="0,0,20,0" />
+                        <RadioButton x:Name="StyleIndicators" Content="Status indicators" GroupName="WorkerStyle" />
+                    </StackPanel>
+                    <TextBlock x:Name="WorkerStatusNote" Style="{StaticResource Note}" Margin="28,10,0,0" />
+                </StackPanel>
+            </Border>
+
             <!-- Projects -->
             <Border Style="{StaticResource Section}">
                 <StackPanel>

@@ -6,13 +6,15 @@ When several VS Code windows are open, Windows' taskbar previews all look alike 
 Project Previews replaces that guesswork with large, readable project names. Rest your pointer on the VS Code icon
 in the taskbar, then click the project you want.
 
-![The Project Previews picker above the VS Code taskbar icon, showing four cards: Storefront (Checkout.tsx), Weather Dashboard (app.py), Website (index.html · Northwind) and Website (styles.css · archive)](docs/images/picker-dark.png)
+![The Project Previews picker above the VS Code taskbar icon, showing four cards: Weather Dashboard (app.py) with a Claude worker waiting for approval and a Codex worker working, Website (styles.css · archive), Storefront (Checkout.tsx) with a working Claude worker, and Website (index.html · Northwind) with a finished Claude worker](docs/images/picker-dark.png)
 
 *Resting the pointer on the VS Code taskbar icon (highlighted, bottom) opens the picker. Each card is one VS Code
-window: its project name, the file it has open, and a blurred preview of the window behind them. Demo projects,
-with blur and darkness turned down slightly from the defaults.*
+window: its project name, the file it has open, and a blurred preview of the window behind them. The small creatures
+are the optional [AI worker status](#optional-ai-worker-status-on-the-cards). Demo projects, with blur and darkness
+turned down slightly from the defaults.*
 
 **Contents:** [Quick start](#quick-start) · [Everyday use](#everyday-use) · [Changing names and looks](#changing-names-and-looks) ·
+[AI worker status](#optional-ai-worker-status-on-the-cards) ·
 [Companion extension](#optional-the-vs-code-companion-extension) · [Turning it off](#turning-it-off-and-uninstalling) ·
 [Troubleshooting](#troubleshooting) · [Limitations](#known-limitations) · [Privacy](#privacy) ·
 [Technical reference](docs/TECHNICAL_REFERENCE.md)
@@ -48,6 +50,7 @@ The **picker** is the popup of cards. Each card is one open VS Code window, labe
 | Open the picker | Rest the pointer on the VS Code taskbar icon, **or** press **Ctrl+Alt+Space**, **or** left-click the tray icon |
 | Switch to a window | Click its card. A minimized window is restored. |
 | Use the keyboard | After opening it with the shortcut or tray icon: arrow keys (or Tab) to move, **Enter** to switch |
+| Close a VS Code window | Turn on **Show a close (X) button on each card** in Settings → General, then click a card's **×**. VS Code closes that window as usual (it asks first if anything is unsaved). |
 | Close the picker | Press **Esc**, click somewhere else, or move the pointer away |
 | Reach VS Code's normal taskbar menu | Right-click the VS Code icon, even while the picker is open |
 
@@ -77,9 +80,9 @@ Right-click the tray icon for these options:
 
 Everything here is in **Settings** (tray icon → Settings…).
 
-![The General section of Settings with "Enable project previews" checked and "Start with Windows" unchecked](docs/images/settings-general.png)
+![The General section of Settings with "Enable project previews" checked, and the close-button and "Start with Windows" options unchecked](docs/images/settings-general.png)
 
-*General: the main on/off switch, and whether the app starts when you sign in to Windows (off unless you turn it on).*
+*General: the main on/off switch, an optional close (×) button on each card, and whether the app starts when you sign in to Windows (both off unless you turn them on).*
 
 ### Project names
 
@@ -100,7 +103,7 @@ The colored dot next to each row sets the project's **accent color**, the stripe
 
 ### Theme, blur and darkness
 
-![Appearance settings: Theme set to Light, Blur 6, Darkness 35%, and a sample card preview](docs/images/settings-appearance.png)
+![Appearance settings: Theme set to Light, Blur 6, Darkness 35%, Preview size and Center text size at 100%, a Reset sizes button, and a sample card preview](docs/images/settings-appearance.png)
 
 *The sample card updates as you move the sliders. More blur makes the preview behind the name softer; more
 darkness makes the name stand out more. Defaults: blur 10, darkness 45%.*
@@ -121,6 +124,38 @@ in both, so the white names remain readable:
 Under **How to open the picker** you can turn off hovering or the shortcut. To change the shortcut, click its
 box and press the new combination; it must include Ctrl, Alt or Win. If another app is already using that
 combination, Settings tells you.
+
+## Optional: AI worker status on the cards
+
+If you use [AI Status Indicator](../AI-Status-Indicator) (Claude Status), each card can show the Claude Code and
+Codex workers running in that VS Code window: their status (Working, Approval, Input, Needs you, Done, Error) and
+which provider they are.
+
+![AI workers settings: "Show AI worker status" checked, display style set to Creatures, and the note "Connected. 4 workers running right now"](docs/images/settings-workers.png)
+
+**To turn it on:** Settings → **AI workers** → **Show AI worker status**. It's off until you turn it on, and the
+change applies immediately. Under it, **Worker display style** picks:
+
+- **Creatures** (default): AI Status Indicator's own pixel creatures, in the pose of their status. Claude Code
+  creatures are orange, Codex creatures lavender or slate blue. A working creature bobs gently (no motion when
+  Windows' *Animation effects* is off).
+- **Status indicators**: a colored dot with the provider and a short status, e.g. `● Claude · Working`.
+
+Both styles always show the status as text as well as color. Several workers of one provider are numbered
+(`Claude #1`, `Claude #2`). Hover a worker for the full status and the session it belongs to. A card shows up to two
+creatures or four indicators; more fold into a `+N` chip whose tooltip lists them.
+
+**What you need:**
+
+1. AI Status Indicator installed (its `install.ps1`). Its *window doesn't have to be open*: the status comes from
+   files its hooks write as Claude Code and Codex run.
+2. The companion extension (below), version 1.1 or later, in VS Code. Workers are matched to windows through it.
+3. For Codex: re-run AI Status Indicator's `install.ps1` (it adds Codex hooks), then **trust the new hooks in Codex
+   once**. Codex doesn't run new hooks until you do.
+
+If the picker header says **AI status unavailable**, AI Status Indicator's status folder wasn't found. If it says
+**N AI workers not matched to a window**, a worker is running in VS Code, but its window can't be identified for
+certain. It isn't put on a card rather than guessed. Details: [technical reference](docs/TECHNICAL_REFERENCE.md#ai-worker-status).
 
 ## Optional: the VS Code companion extension
 
@@ -198,6 +233,11 @@ For a detailed log of hover timing, see [Diagnostics](docs/TECHNICAL_REFERENCE.m
   auto-hide are handled in the code but haven't been tested. The full list is in the
   [technical reference](docs/TECHNICAL_REFERENCE.md#tested-configurations).
 - If you move the app to another folder after turning on **Start with Windows**, turn that option on again.
+- **AI worker status:** a worker started in a VS Code terminal that was opened before the companion extension
+  (1.1+) was active in that window can't be matched until you open a new terminal. Claude Code doesn't report
+  pressing Esc, so a turn interrupted that way shows as **Quiet** after 20 minutes without activity instead of
+  Working. Codex reports no API errors or questions through its hooks, so Codex workers show Working, Approval or
+  Done only.
 
 ## Privacy
 

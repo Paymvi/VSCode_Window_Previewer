@@ -48,6 +48,9 @@ public partial class App : Application
 
     public AppSettings Settings { get; private set; } = new();
     public WindowCatalog Catalog { get; private set; } = null!;
+    /// <summary>AI worker status (AI Status Indicator's files); running only while "Show AI worker status" is on.</summary>
+    public WorkerSource WorkerStatus { get; } = new(WorkerSource.DefaultRoot);
+    private List<ProjectWindow> _shown = [];
     public string? SettingsProblem { get; private set; }
     public string? ShortcutProblem { get; private set; }
     public IReadOnlyDictionary<nint, BitmapSource> Images => _images;
@@ -79,6 +82,7 @@ public partial class App : Application
         _picker.CardChosen += OnCardChosen;
         _picker.TabClicked += OnTabClicked;
         _picker.DismissRequested += () => HidePicker();
+        WorkerStatus.Changed += PushWorkers;
         _mouse = new MouseWatcher(Dispatcher);
         _mouse.TaskbarMove += OnTaskbarMove;
         _mouse.TaskbarLeave += () => { _dwell.Stop(); _anchor = new Native.POINT { X = int.MinValue / 2 }; if (_picker?.IsOpen != true) _suppress = null; };
@@ -140,6 +144,54 @@ public partial class App : Application
             }
         }
         UpdateTrayMenu();
+        ApplyWorkers();
+    }
+
+    /// <summary>Starts or stops worker monitoring to match the settings, and redraws the cards. Changes apply at once.</summary>
+    public void ApplyWorkers()
+    {
+        if (_exiting) return;
+        WorkerChips.Reload();
+        if (Settings.Enabled && Settings.ShowWorkers)
+        {
+            WorkerStatus.Start();
+            WorkerStatus.SetFast(_picker?.IsOpen == true);
+        }
+        else WorkerStatus.Stop();
+        PushWorkers();
+    }
+
+    private void PushWorkers()
+    {
+        if (_picker is null) return;
+        if (!WorkerStatus.Running) { _picker.SetWorkers(new Dictionary<nint, List<WorkerChip>>(), Settings.WorkerStyle, "", ""); return; }
+        var snap = WorkerStatus.Current;
+        var hosts = _shown.Where(w => w.Report is not null).Select(w => new WindowHost(w.Hwnd, w.Report!.Pid, w.Report.SessionId)).ToList();
+        // Reports not bound to a card still count: a worker under one of them is "not matched", never dropped silently.
+        hosts.AddRange(Catalog.Reports.Where(r => hosts.All(h => h.HostPid != r.Pid)).Select(r => new WindowHost(0, r.Pid, r.SessionId)));
+        var (map, unmatched) = Workers.Match(snap.Workers, hosts);
+        var now = DateTime.UtcNow;
+        var chips = map.ToDictionary(kv => kv.Key, kv => Workers.Chips(kv.Value, now));
+        string note = "", tip = "";
+        if (WorkerStatus.HasData && !snap.Available)
+        {
+            note = "AI status unavailable";
+            tip = $"AI Status Indicator's status files weren't found or couldn't be read ({WorkerStatus.SessionsDir}). Its hooks write them; install or repair AI Status Indicator.";
+        }
+        else if (unmatched > 0)
+        {
+            note = $"{unmatched} AI worker{(unmatched == 1 ? "" : "s")} not matched to a window";
+            tip = "Claude Code or Codex is running in a VS Code window that can't be identified for certain (the companion extension is missing or " +
+                  "not yet active there, or the worker's terminal was opened before it). Those workers aren't put on any card rather than guessed.";
+        }
+        _picker.SetWorkers(chips, Settings.WorkerStyle, note, tip);
+    }
+
+    private void ShownWindows(List<ProjectWindow> windows)
+    {
+        _shown = windows;
+        PushWorkers();
+        if (WorkerStatus.Running) WorkerStatus.SetFast(true);
     }
 
     public void SaveSettings()
@@ -235,6 +287,7 @@ public partial class App : Application
         _escapeRegistered = Native.RegisterHotKey(_messages!.Handle, HotkeyEscape, 0, 0x1B);
         _outsideSince = 0;
         _leave.Start();
+        ShownWindows(windows);
         AfterShow(windows);
     }
 
@@ -289,6 +342,7 @@ public partial class App : Application
         if (windows.Count == 0) { Notify("No VS Code windows are open."); return; }
         _hoverButton = null;
         _picker.Present(windows, Settings, PickerMode.Keyboard, null, _images, keepOrder: false);
+        ShownWindows(windows);
         AfterShow(windows);
     }
 
@@ -317,6 +371,7 @@ public partial class App : Application
         if (_escapeRegistered) Unregister(HotkeyEscape);
         StopLiveHooks();
         _captureGen++;
+        if (WorkerStatus.Running) WorkerStatus.SetFast(false);
         if (_mouse is not null)
         {
             _mouse.ReportClicks = false;
@@ -418,6 +473,7 @@ public partial class App : Application
         if (windows.Count == 0) { HidePicker(); return; }
         var known = _picker.Order.ToHashSet();
         _picker.Present(windows, Settings, _picker.Mode, _picker.Mode == PickerMode.Hover ? _hoverButton : null, _images, keepOrder: true);
+        ShownWindows(windows);
         StartLiveHooks(windows);
         StartCaptures(windows.Where(w => !w.Minimized && !known.Contains(w.Hwnd)).Select(w => w.Hwnd));
     }
@@ -571,6 +627,7 @@ public partial class App : Application
         HidePicker();
         _mouse?.Stop();
         Catalog?.Dispose();
+        WorkerStatus.Dispose();
         Unregister(HotkeyPicker);
         Unregister(HotkeyEscape);
         SystemEvents.DisplaySettingsChanged -= OnEnvironmentChanged;

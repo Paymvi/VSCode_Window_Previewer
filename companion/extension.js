@@ -1,6 +1,8 @@
 // Project Previews companion: tells the Project Previews desktop app which folder/workspace this VS Code
 // window has open and the name of its active tab. It writes one small JSON file per window to
 // %LOCALAPPDATA%\ProjectPreviews\windows and nothing else: no file contents, no network.
+// It also sets PROJECT_PREVIEWS_WINDOW (this window's opaque session id) in this window's terminals, so status hooks
+// of agents started there (AI Status Indicator's hook.ps1) can say which window they run in.
 'use strict';
 const vscode = require('vscode');
 const fs = require('fs');
@@ -69,6 +71,9 @@ function activate(context) {
   const id = String(vscode.env.sessionId || process.pid).replace(/[^A-Za-z0-9-]/g, '');
   file = path.join(reportDir(), id + '.json');
   if (vscode.window.state.focused) focusedAt = Date.now();
+  // Not persisted: a terminal restored after a restart must not carry the previous session's id.
+  context.environmentVariableCollection.persistent = false;
+  context.environmentVariableCollection.replace('PROJECT_PREVIEWS_WINDOW', String(vscode.env.sessionId || ''));
   write();
   context.subscriptions.push(
     vscode.window.onDidChangeWindowState(e => {

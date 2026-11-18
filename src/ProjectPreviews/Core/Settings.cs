@@ -13,6 +13,8 @@ public sealed class ProjectPref
 
 public enum ThemeChoice { System, Light, Dark }
 
+public enum WorkerStyle { Creatures, Indicators }
+
 public sealed class AppSettings
 {
     public int Version { get; set; } = 1;
@@ -31,6 +33,10 @@ public sealed class AppSettings
     /// <summary>Center text (alias, subtitle) size on top of the card size, 1 = original.</summary>
     public double TextScale { get; set; } = 1;
     public bool ShowCloseButton { get; set; }
+    /// <summary>Claude Code / Codex worker status on cards, from AI Status Indicator. Off unless turned on.</summary>
+    public bool ShowWorkers { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public WorkerStyle WorkerStyle { get; set; } = WorkerStyle.Creatures;
     public const double MinScale = 0.75, MaxScale = 1.5;
     public Dictionary<string, ProjectPref> Projects { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -41,6 +47,7 @@ public sealed class AppSettings
         CardScale = double.IsFinite(CardScale) ? Math.Clamp(CardScale, MinScale, MaxScale) : 1;
         TextScale = double.IsFinite(TextScale) ? Math.Clamp(TextScale, MinScale, MaxScale) : 1;
         if (!Enum.IsDefined(Theme)) Theme = ThemeChoice.System;
+        if (!Enum.IsDefined(WorkerStyle)) WorkerStyle = WorkerStyle.Creatures;
         if (string.IsNullOrWhiteSpace(Shortcut)) Shortcut = "Ctrl+Alt+Space";
         // Re-key through NormalizeKey so hand edits ("C:/Foo/") still match, and drop empty entries.
         var projects = new Dictionary<string, ProjectPref>(StringComparer.OrdinalIgnoreCase);
