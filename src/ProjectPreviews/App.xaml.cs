@@ -44,6 +44,9 @@ public partial class App : Application
     private bool _escapeRegistered;
     private readonly List<nint> _liveHooks = [];
     private Native.WinEventProc? _liveProc;
+    private Native.WinEventProc? _explorerShowProc; // kept alive: the hook holds a pointer to it
+    private nint _explorerShowHook;
+    private int _explorerPid;
     private bool _exiting;
 
     public AppSettings Settings { get; private set; } = new();
@@ -282,6 +285,7 @@ public partial class App : Application
         _hoverButton = button;
         _picker.Present(windows, Settings, PickerMode.Hover, button, _images, keepOrder: false);
         Log.Write($"shown: snapshot {t1 - t0}ms, present {Environment.TickCount64 - t1}ms");
+        WatchExplorerPopups();
         ScheduleNudges();
         // Esc must work without focusing the popup; registered only while it's open.
         _escapeRegistered = Native.RegisterHotKey(_messages!.Handle, HotkeyEscape, 0, 0x1B);
@@ -289,6 +293,29 @@ public partial class App : Application
         _leave.Start();
         ShownWindows(windows);
         AfterShow(windows);
+    }
+
+    /// <summary>
+    /// Backstop for when the nudges land too late: any top-level Explorer window that appears while our hover popup
+    /// is open and the pointer is still on the VS Code button is Explorer's own thumbnail popup, so hide it at once.
+    /// Hooked per Explorer process (re-hooked if Explorer restarted).
+    /// </summary>
+    private void WatchExplorerPopups()
+    {
+        Native.GetWindowThreadProcessId(Native.FindWindow("Shell_TrayWnd", null), out int pid);
+        if (pid == 0 || (pid == _explorerPid && _explorerShowHook != 0)) return;
+        if (_explorerShowHook != 0) Native.UnhookWinEvent(_explorerShowHook);
+        _explorerPid = pid;
+        _explorerShowProc ??= (hook, ev, hwnd, idObject, idChild, thread, time) =>
+        {
+            if (idObject != 0 || _picker is not { IsOpen: true, Mode: PickerMode.Hover } || _hoverButton is not { } b) return;
+            if (!Native.GetCursorPos(out var p) || !b.Contains(p) || Native.GetAncestor(hwnd, 2 /* GA_ROOT */) != hwnd) return;
+            string cls = Native.ClassName(hwnd);
+            if (cls is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd") return;
+            Native.ShowWindow(hwnd, Native.SW_HIDE);
+            Log.Write($"hid Explorer popup {cls}");
+        };
+        _explorerShowHook = Native.SetWinEventHook(Native.EVENT_OBJECT_SHOW, Native.EVENT_OBJECT_SHOW, 0, _explorerShowProc, (uint)pid, 0, Native.WINEVENT_OUTOFCONTEXT);
     }
 
     /// <summary>
